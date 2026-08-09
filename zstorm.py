@@ -222,23 +222,15 @@ class ZStorm:
         """Print tool banner"""
         banner = f"""
 {Colors.BOLD}{Colors.CYAN}
-╔═══════════════════════════════════════════════════════════════╗
-║                                                               ║
-║     ██████  ██░ ██  ██████  ██████   █████  ████████        ║
-║     ██▓ ██ ▓██░ ██▒▒██▓  ██▒▒██▓  ██▒▓██   ▒ ▓██▒           ║
-║     ▓██  ▓█ ▒██▀▀██░▒██▒  ██▓▒██████  ▒█████  ▒██░           ║
-║     ██████  ░▓█ ░██ ░██▓  ██░▒▓█▒  ░ ░▓█▒  ░ ▒██▓           ║
-║     ██░ ██  ░▓█▒░██▓░▒██████▓▒░▒████░ ░▒████  ░██▓           ║
-║     ▓█████  ░ ░░▒░ ░ ▒ ▒▓▒ ▒ ░░░ ▒░ ░  ░░░▒░  ░▒▓░           ║
-║     ██░ ██  ░ ▒░ ░ ░ ░ ░▒  ░ ░ ░ ░  ░ ░ ░░ ░  ░▒ ░           ║
-║     ▓█████  ░  ░   ░ ░  ░  ░   ░    ░  ░   ░  ░             ║
-║     ██░ ██  ░        ░      ░   ░  ░     ░     ░             ║
-║                                                               ║
-║          Z-Storm v1.0.0 - Network Attack Framework          ║
-║          Developed by Youssef Zedan                         ║
-╚═══════════════════════════════════════════════════════════════╝
-{Colors.END}
-{Colors.YELLOW}⚠️  For Educational Use Only - Authorized Lab Environments{Colors.END}
+   ______  _____  ______  _____  ______  __   __  ______
+  / ____/ / ___/ / __  / / __ / / ____/ / /  / / / ____/
+ / /__   / /__  / /_/ / / /_/ / /__    / /  / / / /___  
+/___/    \___/  \____/  \____/ /____/  /_/  /_/ /____/ 
+
+      {Colors.YELLOW}Z-Storm v1.0.0 - Network Attack Framework{Colors.END}
+      {Colors.GREEN}Developed by: Youssef Zedan{Colors.END}
+
+{Colors.BOLD}{Colors.RED}⚠️  For Educational Use Only - Authorized Lab Environments{Colors.END}
 {Colors.RED}🚫 Unauthorized Use is Prohibited and Illegal{Colors.END}
         """
         print(banner)
@@ -495,17 +487,19 @@ class ZStorm:
         
         report = AdvancedReport(attack_data, network_info)
         
-        # If no custom name is given, generate sequential name
         if report_name is None:
             report_name = self._generate_report_name()
         
-        # Ensure reports directory exists
         reports_dir = self.config.get('reporting', {}).get('save_path', 'reports/')
         if not os.path.exists(reports_dir):
             os.makedirs(reports_dir)
         
-        # Generate the report with the specified name
-        files = report.generate(formats, filename=report_name, save_path=reports_dir)
+        # اختبار إذا كان الـ module يقبل filename، وإذا لا، استخدم الطريقة العادية
+        try:
+            files = report.generate(formats, filename=report_name, save_path=reports_dir)
+        except TypeError:
+            # في حال عدم دعم filename، احفظ بالاسم الافتراضي في المجلد المحدد
+            files = report.generate(formats, save_path=reports_dir)
         
         print("\n📁 Report files:")
         for fmt, filepath in files.items():
@@ -516,7 +510,6 @@ class ZStorm:
         base_name = "scan" if self.attack_mode == "scan" else "attack"
         reports_dir = self.config.get('reporting', {}).get('save_path', 'reports/')
         
-        # Find the next available number
         existing_files = os.listdir(reports_dir) if os.path.exists(reports_dir) else []
         max_num = 0
         
@@ -577,24 +570,20 @@ Examples:
         config_file=args.config
     )
     
-    # Update settings based on user input
     if args.target:
         storm.config['arp_spoofing']['target_ip'] = args.target
     if args.gateway:
         storm.config['arp_spoofing']['gateway_ip'] = args.gateway
     
-    # Handling Scanning with optional report
     if args.scan:
         storm.scan_network()
         if args.report:
             storm._generate_report(report_name="scan")
         sys.exit(0)
     
-    # Set attack mode
     storm.attack_mode = args.mode
     storm.thread_count = args.threads
     
-    # If ARP mode is selected, enable it in config
     if args.mode == "arp":
         if not storm.config['arp_spoofing']['target_ip']:
             print("\n[!] Target IP not specified with --target.")
@@ -620,7 +609,6 @@ Examples:
         print(f"[*] ARP Spoofing configured: Target={storm.config['arp_spoofing']['target_ip']}, Gateway={storm.config['arp_spoofing']['gateway_ip']}")
     
     try:
-        # Start attack and optionally generate report
         storm.start_attack(save_report=args.report)
     except KeyboardInterrupt:
         print("\n[!] Interrupted")
