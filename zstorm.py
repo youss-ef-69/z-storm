@@ -222,10 +222,12 @@ class ZStorm:
         """Print tool banner"""
         banner = f"""
 {Colors.BOLD}{Colors.CYAN}
-   ______  _____  ______  _____  ______  __   __  ______
-  / ____/ / ___/ / __  / / __ / / ____/ / /  / / / ____/
- / /__   / /__  / /_/ / / /_/ / /__    / /  / / / /___  
-/___/    \___/  \____/  \____/ /____/  /_/  /_/ /____/ 
+███████╗    ███████╗████████╗ ██████╗ ██████╗ ███╗   ███╗
+╚══███╔╝    ██╔════╝╚══██╔══╝██╔═══██╗██╔══██╗████╗ ████║
+  ███╔╝     ███████╗   ██║   ██║   ██║██████╔╝██╔████╔██║
+ ███╔╝      ╚════██║   ██║   ██║   ██║██╔══██╗██║╚██╔╝██║
+███████╗    ███████║   ██║   ╚██████╔╝██║  ██║██║ ╚═╝ ██║
+╚══════╝    ╚══════╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝
 
       {Colors.YELLOW}Z-Storm v1.0.0 - Network Attack Framework{Colors.END}
       {Colors.GREEN}Developed by: Youssef Zedan{Colors.END}
@@ -485,8 +487,6 @@ class ZStorm:
         
         formats = self.config.get('reporting', {}).get('formats', ['json', 'html', 'markdown'])
         
-        report = AdvancedReport(attack_data, network_info)
-        
         if report_name is None:
             report_name = self._generate_report_name()
         
@@ -494,15 +494,28 @@ class ZStorm:
         if not os.path.exists(reports_dir):
             os.makedirs(reports_dir)
         
-        # اختبار إذا كان الـ module يقبل filename، وإذا لا، استخدم الطريقة العادية
-        try:
-            files = report.generate(formats, filename=report_name, save_path=reports_dir)
-        except TypeError:
-            # في حال عدم دعم filename، احفظ بالاسم الافتراضي في المجلد المحدد
-            files = report.generate(formats, save_path=reports_dir)
+        # --- الحل الجديد والنهائي ---
+        # 1. نحفظ المسار الحالي، ثم ننتقل لمجلد التقارير
+        original_cwd = os.getcwd()
+        os.chdir(reports_dir)
+        
+        # 2. ننشئ التقرير دون أي خيارات إضافية (لأننا في المجلد الصحيح)
+        report = AdvancedReport(attack_data, network_info)
+        files = report.generate(formats)
+        
+        # 3. نعيد تسمية الملفات يدوياً
+        renamed_files = {}
+        for fmt, filepath in files.items():
+            new_name = f"{report_name}.{fmt}"
+            if os.path.exists(filepath):
+                os.rename(filepath, new_name)
+                renamed_files[fmt] = os.path.join(reports_dir, new_name)
+        
+        # 4. نعود للمسار الأصلي
+        os.chdir(original_cwd)
         
         print("\n📁 Report files:")
-        for fmt, filepath in files.items():
+        for fmt, filepath in renamed_files.items():
             print(f"   • {fmt}: {filepath}")
     
     def _generate_report_name(self) -> str:
