@@ -24,23 +24,23 @@ echo -e "${GREEN}[+] Installing dependencies...${NC}"
 sudo apt-get update
 sudo apt-get install -y tcpdump arp-scan nmap
 
-sudo apt install -y python3-scapy python3-requests python3-yaml python3-colorama
+# تثبيت مكتبات بايثون المطلوبة (تمت إضافة netifaces)
+sudo apt install -y python3-scapy python3-requests python3-yaml python3-colorama python3-netifaces
 
 # Create system-wide command
 echo -e "${GREEN}[+] Setting up system-wide 'zstorm' command ...${NC}"
 
-sudo tee /usr/local/bin/zstorm > /dev/null << 'EOF'
-#!/bin/bash
+# استخدام المسار الديناميكي للمجلد الحالي (لن يحدث الخطأ مرة أخرى)
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-SCRIPT_DIR=$(dirname "$(realpath "$0")")
-python3 "$SCRIPT_DIR/zstorm.py" "$@"
+# كتابة الأمر مع sudo داخله، ليعمل مع أي مستخدم دون الحاجة لإعادة كتابة sudo
+sudo tee /usr/local/bin/zstorm > /dev/null << EOF
+#!/bin/bash
+sudo python3 $DIR/zstorm.py "\$@"
 EOF
 
 sudo chmod +x /usr/local/bin/zstorm
 
 echo -e "${GREEN}[+] Done! You can now run 'zstorm' from anywhere in the terminal.${NC}"
-
-# 
 echo -e "${GREEN}[+] Installation complete!${NC}"
-echo -e "${GREEN}[+] You can now run 'zstorm' from ANYWHERE in the terminal.${NC}"
-echo -e "${YELLOW}[!] Don't forget to edit 'config.yaml' before running.${NC}"
+echo -e "${GREEN}[+] Usage: zstorm -i eth0 [--scan / -m arp]${NC}"

