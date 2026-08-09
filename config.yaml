@@ -1,48 +1,42 @@
 # Z-Storm Configuration
 
+interface: eth0
+
 attack:
-    mode: "intelligent"
-    threads: 5
-    max_macs: 10000
-    delay_min: 0.001
-    delay_max: 0.01
-    auto_detect_dhcp: true
-    timeout: 300
-  
-  smart_scanner:
-    enabled: true
-    timeout: 5
-    classify_devices: true
-  
-  reporting:
-    enabled: true
-    formats: ["json", "html", "markdown"]
-    include_network_info: true
-    include_recommendations: true
-    save_path: "reports/"
-  
-  arp_spoofing:
-    enabled: false
-    target_ip: null
-    gateway_ip: null
-    interval: 2.0
-  
-  lab_automation:
-    enabled: false
-    lab_type: "eve-ng"
-    auto_setup: true
-    auto_cleanup: true
-  
-  logging:
-    level: "INFO"
-    file: "dhcp_attack.log"
-    max_size_mb: 10
-  
-  network:
-    interface: "auto"
-    timeout: 2
-    retries: 3
-  
-  stealth:
-    randomize_delay: true
-    spoof_mac: false
+  mode: "intelligent"
+  type: "dhcp_starvation"
+  threads: 5
+  max_macs: 10000
+  delay_min: 0.001
+  delay_max: 0.01
+  auto_detect_dhcp: true
+  timeout: 300
+
+smart_scanner:
+  enabled: true
+  timeout: 5
+  classify_devices: true
+
+reporting:
+  enabled: true
+  formats: ["json", "html", "markdown"]
+  include_network_info: true
+  include_recommendations: true
+  save_path: "reports/"
+
+arp_spoofing:
+  enabled: false
+  target_ip: null
+  gateway_ip: null
+  interval: 2.0
+
+lab_automation:
+  enabled: false
+  lab_type: "eve-ng"
+  auto_setup: true
+  auto_cleanup: true
+
+logging:
+  level: "INFO"
+  file: "dhcp_attack.log"
+  max_size_mb: 10
