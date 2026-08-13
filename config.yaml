@@ -1,4 +1,5 @@
 # Z-Storm Configuration
+# Advanced Network Attack Framework
 
 interface: eth0
 
@@ -29,6 +30,20 @@ arp_spoofing:
   target_ip: null
   gateway_ip: null
   interval: 2.0
+  restore_on_exit: true
+
+# NEW: DTP Spoofing Configuration
+dtp_spoofing:
+  enabled: false
+  target_mac: null
+  interval: 5.0
+  domain: "z-storm-vlan"
+  status: 3
+  vtp: 1
+  neighbor: 1
+  randomize_delay: false
+  negotiate_desirable: true
+  vlan_range: "1-4094"
 
 lab_automation:
   enabled: false
@@ -38,5 +53,24 @@ lab_automation:
 
 logging:
   level: "INFO"
-  file: "dhcp_attack.log"
+  file: "zstorm.log"
   max_size_mb: 10
+  backup_count: 3
+  console_output: true
+
+stealth:
+  enabled: false
+  randomize_delay: true
+  spoof_mac: false
+  randomize_mac_oui: true
+
+performance:
+  batch_size: 100
+  queue_size: 1000
+  optimize_buffer: true
+
+security:
+  ethical_use: true
+  require_auth: false
+  allowed_ips: []
+  disable_dangerous: false
