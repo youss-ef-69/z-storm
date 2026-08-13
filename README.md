@@ -54,119 +54,40 @@
 
 ### Python Dependencies
 
-
-⚖️ Legal Notice
+Legal Notice & Copyright
 THIS SOFTWARE IS PROVIDED FOR EDUCATIONAL AND RESEARCH PURPOSES ONLY.
 
-⚠️ IMPORTANT LEGAL WARNINGS
-Authorized Use Only
+Copyright © 2026 Youssef Zedan. All Rights Reserved.
 
-This tool may ONLY be used on:
+This software and its source code are the exclusive property of Youssef Zedan. Unauthorized copying, modification, distribution, or use is strictly prohibited. "Z-Storm" name and logo are trademarks.
 
-Your own private networks
+Important Legal Warnings
+Authorized Use Only: This tool may ONLY be used on your own private networks, networks with explicit written permission, or authorized penetration testing labs
 
-Networks where you have explicit written permission
+Unauthorized Use is ILLEGAL: Using this tool on networks you don't own or have permission to test is a violation of local and international laws, considered a cybercrime, and subject to severe legal penalties
 
-Authorized penetration testing labs (EVE-NG, GNS3, etc.)
+Commercial Use Prohibited: Selling this tool or using it for commercial purposes is strictly forbidden
 
-Educational environments under supervision
+No Warranty: This tool is provided "AS IS" without any warranty. The developer is NOT responsible for any damage, legal consequences, or financial losses
 
-Unauthorized Use is ILLEGAL
+User Responsibility: You are SOLELY responsible for how you use this tool, obtaining proper authorization, complying with all laws, and any consequences of your actions
 
-Using this tool on networks you don't own or have permission to test is:
+Ethical Use Agreement: By using this tool, you agree to use it ethically, never for malicious purposes, respect privacy, and accept full legal responsibility
 
-A violation of local and international laws
-
-Considered a cybercrime in most jurisdictions
-
-Subject to severe legal penalties including imprisonment
-
-Commercial Use Prohibited
-
-Selling this tool or any of its components is strictly forbidden
-
-Using this tool for commercial purposes without explicit permission is prohibited
-
-Monetizing attacks performed with this tool is illegal
-
-No Warranty
-
-This tool is provided "AS IS" without any warranty
-
-The developer is NOT responsible for:
-
-Any damage caused by using this tool
-
-Any legal consequences of misuse
-
-Any financial or reputational damage
-
-Any data loss or security breaches
-
-User Responsibility
-
-You are SOLELY responsible for:
-
-How you use this tool
-
-Obtaining proper authorization
-
-Complying with all applicable laws
-
-Any consequences of your actions
-
-Ethical Use Agreement
-
-By downloading, installing, or using this tool, you agree to:
-
-Use it ethically and responsibly
-
-Never use it for malicious purposes
-
-Respect others' privacy and property rights
-
-Accept full legal responsibility for your actions
-
-🚫 Prohibited Activities
-The following are STRICTLY PROHIBITED:
-
+Prohibited Activities
 Attacking any network without explicit permission
 
-Using this tool for extortion, blackmail, or harassment
+Using for extortion, blackmail, or harassment
 
-Selling or distributing this tool commercially
+Selling or distributing commercially
 
 Removing or altering this legal notice
 
-Using this tool for any illegal purpose
+Using for any illegal purpose
 
-📜 Legal Compliance
-Users must comply with all applicable laws including but not limited to:
+Contact
+GitHub: github.com/youss-ef-69
 
-Computer Fraud and Abuse Act (CFAA) - USA
+Repository: github.com/youss-ef-69/z-storm
 
-General Data Protection Regulation (GDPR) - EU
-
-Network and Information Systems Directive (NIS) - EU
-
-Local cybercrime laws in your jurisdiction
-
-International cybercrime treaties
-
-📄 Copyright
-Copyright © 2026 Youssef Zedan. All Rights Reserved.
-
-All Rights Reserved
-This software and its source code are the exclusive property of Youssef Zedan. Unauthorized copying, modification, distribution, or use of this software is strictly prohibited.
-
-Intellectual Property
-Code: All code is original work by Youssef Zedan
-
-Design: Framework architecture and design are proprietary
-
-Documentation: All documentation is copyrighted
-
-Brand: "Z-Storm" name and logo are trademarks
-
-Permissions
-For permissions beyond the scope of this license, contact the developer:
+Remember: With great power comes great responsibility. Use ethically and legally! 🌩️
