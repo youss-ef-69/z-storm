@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# Z-Storm Installation Script v2.1 (Lightning Fast)
+# Z-Storm Installation Script v2.0.0
 # Developed by: Youssef Zedan
 # ============================================================
 
@@ -9,6 +9,9 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
 NC='\033[0m' # No Color
 
 # Print colored messages
@@ -28,18 +31,59 @@ print_warning() {
     echo -e "${YELLOW}[⚠]${NC} $1"
 }
 
-# Print banner
-echo ""
+# Function to show spinning animation while command runs
+show_spinner() {
+    local pid=$1
+    local delay=0.1
+    local spinstr='|/-\'
+    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+        local temp=${spinstr#?}
+        printf " [%c]  " "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+        printf "\b\b\b\b\b\b"
+    done
+    printf "    \b\b\b\b"
+}
+
+# Function to run command with spinner
+run_with_spinner() {
+    local cmd="$1"
+    local msg="$2"
+    
+    echo -ne "${BLUE}[*]${NC} $msg "
+    
+    # Run command in background
+    eval "$cmd" > /dev/null 2>&1 &
+    local pid=$!
+    
+    # Show spinner while command runs
+    show_spinner $pid
+    
+    # Wait for command to finish
+    wait $pid
+    
+    # Check if command succeeded
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Done${NC}"
+    else
+        echo -e "${RED}✗ Failed${NC}"
+        return 1
+    fi
+}
+
+# Print banner with colors
+echo -e "${CYAN}"
 echo "███████╗    ███████╗████████╗ ██████╗ ██████╗ ███╗   ███╗"
 echo "╚══███╔╝    ██╔════╝╚══██╔══╝██╔═══██╗██╔══██╗████╗ ████║"
-echo "  ███╔╝     ███████╗   ██║   ██║   ██║██████╔╝██╔████╔██║"
+echo -e "${PURPLE}  ███╔╝     ███████╗   ██║   ██║   ██║██████╔╝██╔████╔██║"
 echo " ███╔╝      ╚════██║   ██║   ██║   ██║██╔══██╗██║╚██╔╝██║"
-echo "███████╗    ███████║   ██║   ╚██████╔╝██║  ██║██║ ╚═╝ ██║"
+echo -e "${CYAN}███████╗    ███████║   ██║   ╚██████╔╝██║  ██║██║ ╚═╝ ██║"
 echo "╚══════╝    ╚══════╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝"
-echo ""
-echo "         Z-Storm Installation Script v2.1"
-echo "         Developed by: Youssef Zedan"
-echo "         ⚡ Lightning Fast Mode"
+echo -e "${NC}"
+echo -e "${GREEN}         Z-Storm Installation Script v2.0.0${NC}"
+echo -e "${YELLOW}         Developed by: Youssef Zedan${NC}"
+echo -e "${BLUE}         ⚡ Lightning Fast Mode${NC}"
 echo ""
 
 # ============================================================
@@ -69,127 +113,84 @@ fi
 print_success "Detected OS: $OS $VERSION"
 
 # ============================================================
-# 3. Update Package Lists (Lightweight - NO UPGRADE)
+# 3. Update Package Lists with Spinner
 # ============================================================
 print_info "Updating package lists (lightweight)..."
 print_warning "Skipping system upgrade to save time"
 
 if command -v apt-get &> /dev/null; then
-    apt-get update -y --quiet=2
+    run_with_spinner "apt-get update -y --quiet=2" "Updating package lists..."
 elif command -v yum &> /dev/null; then
-    yum check-update -y
+    run_with_spinner "yum check-update -y" "Checking for updates..."
 elif command -v dnf &> /dev/null; then
-    dnf check-update -y
+    run_with_spinner "dnf check-update -y" "Checking for updates..."
 else
     print_warning "Could not update package lists (no known package manager)"
 fi
 
-print_success "Package lists updated"
+print_success "Package lists updated (or skipped)"
 
 # ============================================================
-# 4. Install Python3 and pip (Minimal)
+# 4. Install Python3 and pip with Spinner
 # ============================================================
 print_info "Installing Python3 and pip (minimal)..."
 
 if command -v apt-get &> /dev/null; then
-    apt-get install -y --no-install-recommends python3 python3-pip python3-venv
+    run_with_spinner "apt-get install -y --no-install-recommends python3 python3-pip python3-venv" "Installing Python..."
 elif command -v yum &> /dev/null; then
-    yum install -y python3 python3-pip
+    run_with_spinner "yum install -y python3 python3-pip" "Installing Python..."
 elif command -v dnf &> /dev/null; then
-    dnf install -y python3 python3-pip
+    run_with_spinner "dnf install -y python3 python3-pip" "Installing Python..."
 else
     print_warning "Could not install Python (no known package manager)"
 fi
 
 # ============================================================
-# 5. Install System Dependencies (Minimal)
+# 5. Install System Dependencies with Spinner
 # ============================================================
 print_info "Installing system dependencies (minimal)..."
 
 if command -v apt-get &> /dev/null; then
-    apt-get install -y --no-install-recommends \
-        tcpdump \
-        net-tools \
-        iproute2 \
-        ethtool \
-        build-essential \
-        python3-dev \
-        libpcap-dev
+    run_with_spinner "apt-get install -y --no-install-recommends tcpdump net-tools iproute2 ethtool build-essential python3-dev libpcap-dev" "Installing dependencies..."
 elif command -v yum &> /dev/null; then
-    yum install -y \
-        tcpdump \
-        net-tools \
-        iproute \
-        ethtool \
-        gcc \
-        python3-devel \
-        libpcap-devel
+    run_with_spinner "yum install -y tcpdump net-tools iproute ethtool gcc python3-devel libpcap-devel" "Installing dependencies..."
 elif command -v dnf &> /dev/null; then
-    dnf install -y \
-        tcpdump \
-        net-tools \
-        iproute \
-        ethtool \
-        gcc \
-        python3-devel \
-        libpcap-devel
+    run_with_spinner "dnf install -y tcpdump net-tools iproute ethtool gcc python3-devel libpcap-devel" "Installing dependencies..."
 fi
 
 print_success "System dependencies installed"
 
 # ============================================================
-# 6. Install Python Dependencies (Fast)
+# 6. Install Python Dependencies with Spinner
 # ============================================================
 print_info "Installing Python packages (fast mode)..."
 
-# Skip pip upgrade to save time
-# python3 -m pip install --upgrade pip
-
-# Install only essential packages (no extra packages)
 print_info "Installing core packages (essential only)..."
-pip3 install --no-cache-dir --no-deps \
-    scapy \
-    netifaces \
-    pyyaml \
-    tqdm \
-    colorama \
-    jinja2 \
-    tabulate
+run_with_spinner "pip3 install --no-cache-dir --no-deps scapy netifaces pyyaml tqdm colorama jinja2 tabulate" "Installing core packages..."
 
-# Install dependencies for the packages (minimal)
-pip3 install --no-cache-dir \
-    requests \
-    psutil
+run_with_spinner "pip3 install --no-cache-dir requests psutil" "Installing additional packages..."
 
 print_success "Python packages installed"
 
 # Check if scapy was installed correctly
 print_info "Verifying Scapy installation..."
-python3 -c "from scapy.all import *; print('Scapy installed successfully')" 2>/dev/null
-if [ $? -eq 0 ]; then
+if python3 -c "from scapy.all import *; print('Scapy installed successfully')" 2>/dev/null; then
     print_success "Scapy installed successfully"
 else
     print_warning "Scapy may not be installed correctly. Installing with extra options..."
-    pip3 install --no-cache-dir scapy --ignore-installed
+    run_with_spinner "pip3 install --no-cache-dir scapy --ignore-installed" "Re-installing Scapy..."
 fi
 
 # ============================================================
 # 7. Create Directories
 # ============================================================
 print_info "Creating directories..."
-
-# Create main directories
-mkdir -p reports
-mkdir -p logs
-
-# Set permissions
-chmod 755 reports
-chmod 755 logs
-
+mkdir -p reports logs
+chmod 755 reports logs
 print_success "Directories created: reports/, logs/"
 
 # ============================================================
-# 8. Check Module Files (Skip if not needed)
+# 8. Check Module Files
 # ============================================================
 print_info "Checking module files..."
 
@@ -221,11 +222,8 @@ fi
 # 9. Set Permissions
 # ============================================================
 print_info "Setting permissions..."
-
-# Make main script executable
 chmod +x zstorm.py 2>/dev/null
 chmod +x install.sh 2>/dev/null
-
 print_success "Permissions set"
 
 # ============================================================
@@ -236,7 +234,7 @@ print_info "Checking config file..."
 if [ ! -f "config.yaml" ]; then
     print_warning "config.yaml not found. Creating default..."
     cat > config.yaml << 'EOF'
-# Z-Storm Configuration
+# Z-Storm Configuration v2.0.0
 
 interface: eth0
 
@@ -299,13 +297,11 @@ else
 fi
 
 # ============================================================
-# 12. Test Run (Skip to save time)
+# 12. Quick Test
 # ============================================================
 print_info "Quick test..."
 
-python3 -c "import sys; sys.path.insert(0, '.'); from modules import *; print('Modules imported successfully')" 2>/dev/null
-
-if [ $? -eq 0 ]; then
+if python3 -c "import sys; sys.path.insert(0, '.'); from modules import *; print('Modules imported successfully')" 2>/dev/null; then
     print_success "Z-Storm modules loaded correctly"
 else
     print_warning "Module import test failed. Please check your setup."
@@ -319,7 +315,7 @@ echo "=========================================="
 echo "        Installation Complete!"
 echo "=========================================="
 echo ""
-print_success "Z-Storm v2.1.0 installed successfully!"
+print_success "Z-Storm v2.0.0 installed successfully!"
 echo ""
 print_info "What's installed (Fast Mode):"
 echo "  📦 Python 3.x"
