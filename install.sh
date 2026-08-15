@@ -11,68 +11,14 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
-WHITE='\033[1;37m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Print colored messages
-print_info() {
-    echo -e "${BLUE}[*]${NC} $1"
-}
+print_info() { echo -e "${BLUE}[*]${NC} $1"; }
+print_success() { echo -e "${GREEN}[+]${NC} $1"; }
+print_error() { echo -e "${RED}[!]${NC} $1"; }
+print_warning() { echo -e "${YELLOW}[⚠]${NC} $1"; }
 
-print_success() {
-    echo -e "${GREEN}[+]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[!]${NC} $1"
-}
-
-print_warning() {
-    echo -e "${YELLOW}[⚠]${NC} $1"
-}
-
-# Function to show spinning animation while command runs
-show_spinner() {
-    local pid=$1
-    local delay=0.1
-    local spinstr='|/-\'
-    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
-        local temp=${spinstr#?}
-        printf " [%c]  " "$spinstr"
-        local spinstr=$temp${spinstr%"$temp"}
-        sleep $delay
-        printf "\b\b\b\b\b\b"
-    done
-    printf "    \b\b\b\b"
-}
-
-# Function to run command with spinner
-run_with_spinner() {
-    local cmd="$1"
-    local msg="$2"
-    
-    echo -ne "${BLUE}[*]${NC} $msg "
-    
-    # Run command in background
-    eval "$cmd" > /dev/null 2>&1 &
-    local pid=$!
-    
-    # Show spinner while command runs
-    show_spinner $pid
-    
-    # Wait for command to finish
-    wait $pid
-    
-    # Check if command succeeded
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✓ Done${NC}"
-    else
-        echo -e "${RED}✗ Failed${NC}"
-        return 1
-    fi
-}
-
-# Print banner with colors
+# Print banner
 echo -e "${CYAN}"
 echo "███████╗    ███████╗████████╗ ██████╗ ██████╗ ███╗   ███╗"
 echo "╚══███╔╝    ██╔════╝╚══██╔══╝██╔═══██╗██╔══██╗████╗ ████║"
@@ -83,12 +29,10 @@ echo "╚══════╝    ╚══════╝   ╚═╝    ╚═
 echo -e "${NC}"
 echo -e "${GREEN}         Z-Storm Installation Script v2.0.0${NC}"
 echo -e "${YELLOW}         Developed by: Youssef Zedan${NC}"
-echo -e "${BLUE}         ⚡ Lightning Fast Mode${NC}"
+echo -e "${BLUE}         ⚡ APT-Based Installation${NC}"
 echo ""
 
-# ============================================================
-# 1. Check if running as root
-# ============================================================
+# Check root
 if [ "$EUID" -ne 0 ]; then 
     print_error "Please run as root (sudo ./install.sh)"
     exit 1
@@ -97,10 +41,9 @@ fi
 print_success "Running as root user"
 
 # ============================================================
-# 2. Detect OS and Package Manager
+# 1. Detect OS
 # ============================================================
 print_info "Detecting operating system..."
-
 if [ -f /etc/os-release ]; then
     . /etc/os-release
     OS=$ID
@@ -109,206 +52,85 @@ else
     print_error "Cannot detect OS"
     exit 1
 fi
-
 print_success "Detected OS: $OS $VERSION"
 
 # ============================================================
-# 3. Update Package Lists with Spinner
+# 2. Install Scapy and dependencies via APT
 # ============================================================
-print_info "Updating package lists (lightweight)..."
-print_warning "Skipping system upgrade to save time"
+print_info "Updating package lists..."
+apt-get update -y --quiet=2
 
-if command -v apt-get &> /dev/null; then
-    run_with_spinner "apt-get update -y --quiet=2" "Updating package lists..."
-elif command -v yum &> /dev/null; then
-    run_with_spinner "yum check-update -y" "Checking for updates..."
-elif command -v dnf &> /dev/null; then
-    run_with_spinner "dnf check-update -y" "Checking for updates..."
-else
-    print_warning "Could not update package lists (no known package manager)"
-fi
-
-print_success "Package lists updated (or skipped)"
+print_info "Installing Scapy and dependencies via APT..."
+apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    python3-scapy \
+    python3-netifaces \
+    python3-yaml
 
 # ============================================================
-# 4. Install Python3 and pip with Spinner
+# 3. Install additional Python packages (lightweight)
 # ============================================================
-print_info "Installing Python3 and pip (minimal)..."
-
-if command -v apt-get &> /dev/null; then
-    run_with_spinner "apt-get install -y --no-install-recommends python3 python3-pip python3-venv" "Installing Python..."
-elif command -v yum &> /dev/null; then
-    run_with_spinner "yum install -y python3 python3-pip" "Installing Python..."
-elif command -v dnf &> /dev/null; then
-    run_with_spinner "dnf install -y python3 python3-pip" "Installing Python..."
-else
-    print_warning "Could not install Python (no known package manager)"
-fi
+print_info "Installing additional Python packages..."
+pip3 install --no-cache-dir --no-deps \
+    tqdm \
+    colorama \
+    jinja2 \
+    tabulate 2>/dev/null || print_warning "Some packages failed (optional)"
 
 # ============================================================
-# 5. Install System Dependencies with Spinner
+# 4. Verify Scapy installation
 # ============================================================
-print_info "Installing system dependencies (minimal)..."
-
-if command -v apt-get &> /dev/null; then
-    run_with_spinner "apt-get install -y --no-install-recommends tcpdump net-tools iproute2 ethtool build-essential python3-dev libpcap-dev" "Installing dependencies..."
-elif command -v yum &> /dev/null; then
-    run_with_spinner "yum install -y tcpdump net-tools iproute ethtool gcc python3-devel libpcap-devel" "Installing dependencies..."
-elif command -v dnf &> /dev/null; then
-    run_with_spinner "dnf install -y tcpdump net-tools iproute ethtool gcc python3-devel libpcap-devel" "Installing dependencies..."
-fi
-
-print_success "System dependencies installed"
-
-# ============================================================
-# 6. Install Python Dependencies with Spinner
-# ============================================================
-print_info "Installing Python packages (fast mode)..."
-
-print_info "Installing core packages (essential only)..."
-run_with_spinner "pip3 install --no-cache-dir --no-deps scapy netifaces pyyaml tqdm colorama jinja2 tabulate" "Installing core packages..."
-
-run_with_spinner "pip3 install --no-cache-dir requests psutil" "Installing additional packages..."
-
-print_success "Python packages installed"
-
-# Check if scapy was installed correctly
 print_info "Verifying Scapy installation..."
-if python3 -c "from scapy.all import *; print('Scapy installed successfully')" 2>/dev/null; then
-    print_success "Scapy installed successfully"
+if python3 -c "import scapy" 2>/dev/null; then
+    print_success "Scapy installed successfully!"
 else
-    print_warning "Scapy may not be installed correctly. Installing with extra options..."
-    run_with_spinner "pip3 install --no-cache-dir scapy --ignore-installed" "Re-installing Scapy..."
+    print_error "Scapy installation failed. Trying pipx fallback..."
+    apt-get install -y pipx
+    pipx install scapy
+    pipx ensurepath
 fi
 
 # ============================================================
-# 7. Create Directories
+# 5. Create directories
 # ============================================================
 print_info "Creating directories..."
 mkdir -p reports logs
 chmod 755 reports logs
-print_success "Directories created: reports/, logs/"
 
 # ============================================================
-# 8. Check Module Files
+# 6. Set permissions and symlink
 # ============================================================
-print_info "Checking module files..."
-
-MODULES_DIR="modules"
-MODULES=(
-    "__init__.py"
-    "smart_scanner.py"
-    "advanced_report.py"
-    "arp_spoof.py"
-    "auto_lab.py"
-    "dtp_spoof.py"
-)
-
-MISSING_MODULES=()
-for module in "${MODULES[@]}"; do
-    if [ ! -f "$MODULES_DIR/$module" ]; then
-        MISSING_MODULES+=("$module")
-    fi
-done
-
-if [ ${#MISSING_MODULES[@]} -eq 0 ]; then
-    print_success "All module files present"
-else
-    print_warning "Missing modules: ${MISSING_MODULES[*]}"
-    print_info "Please ensure all module files are present before running"
-fi
+chmod +x zstorm.py
+ln -sf $(pwd)/zstorm.py /usr/local/bin/zstorm 2>/dev/null
 
 # ============================================================
-# 9. Set Permissions
+# 7. Create config.yaml if missing
 # ============================================================
-print_info "Setting permissions..."
-chmod +x zstorm.py 2>/dev/null
-chmod +x install.sh 2>/dev/null
-print_success "Permissions set"
-
-# ============================================================
-# 10. Create config.yaml if missing
-# ============================================================
-print_info "Checking config file..."
-
 if [ ! -f "config.yaml" ]; then
-    print_warning "config.yaml not found. Creating default..."
+    print_info "Creating default config.yaml..."
     cat > config.yaml << 'EOF'
-# Z-Storm Configuration v2.0.0
-
 interface: eth0
-
 attack:
   mode: "intelligent"
   type: "dhcp_starvation"
   threads: 5
   max_macs: 10000
-  delay_min: 0.001
-  delay_max: 0.01
-  timeout: 300
-
 dtp_spoofing:
   enabled: false
   interval: 5.0
   domain: "z-storm-vlan"
-  status: 3
-  vtp: 1
-  neighbor: 1
-
-smart_scanner:
-  enabled: true
-  timeout: 5
-  classify_devices: true
-
 arp_spoofing:
   enabled: false
   interval: 2.0
-  restore_on_exit: true
-
-reporting:
-  enabled: true
-  formats: ["json", "html", "markdown"]
-  save_path: "reports/"
-
 logging:
   level: "INFO"
   file: "zstorm.log"
-  max_size_mb: 10
-  backup_count: 3
 EOF
-    print_success "Default config.yaml created"
-else
-    print_success "config.yaml exists"
 fi
 
 # ============================================================
-# 11. Check Python Version
-# ============================================================
-print_info "Checking Python version..."
-
-PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-REQUIRED_VERSION="3.6"
-
-if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$PYTHON_VERSION" | sort -V | head -n1)" = "$REQUIRED_VERSION" ]; then
-    print_success "Python version $PYTHON_VERSION (OK)"
-else
-    print_warning "Python version $PYTHON_VERSION (min required: $REQUIRED_VERSION)"
-    print_info "Consider upgrading Python"
-fi
-
-# ============================================================
-# 12. Quick Test
-# ============================================================
-print_info "Quick test..."
-
-if python3 -c "import sys; sys.path.insert(0, '.'); from modules import *; print('Modules imported successfully')" 2>/dev/null; then
-    print_success "Z-Storm modules loaded correctly"
-else
-    print_warning "Module import test failed. Please check your setup."
-fi
-
-# ============================================================
-# 13. Final Summary
+# 8. Final summary
 # ============================================================
 echo ""
 echo "=========================================="
@@ -317,30 +139,13 @@ echo "=========================================="
 echo ""
 print_success "Z-Storm v2.0.0 installed successfully!"
 echo ""
-print_info "What's installed (Fast Mode):"
-echo "  📦 Python 3.x"
-echo "  📦 Scapy (packet manipulation)"
-echo "  📦 netifaces (interface detection)"
-echo "  📦 pyyaml (configuration)"
-echo "  📦 tqdm (progress bars)"
-echo "  📦 colorama (colored output)"
-echo "  📦 jinja2 (HTML reports)"
-echo "  📦 tabulate (table formatting)"
-echo ""
-print_info "Directory structure:"
-echo "  📁 reports/ - Generated reports"
-echo "  📁 logs/    - Log files"
-echo "  📁 modules/ - All modules"
-echo ""
-print_info "Configuration:"
-echo "  📄 config.yaml - Edit to customize"
+print_info "Installed via APT:"
+echo "  python3, python3-pip"
+echo "  python3-scapy, python3-netifaces, python3-yaml"
 echo ""
 print_success "Run Z-Storm:"
-echo "  sudo python3 zstorm.py -h"
-echo "  sudo python3 zstorm.py -i eth0 --type dhcp_starvation"
-echo "  sudo python3 zstorm.py -i eth0 --type dtp_spoofing"
+echo "  sudo zstorm -h"
+echo "  sudo zstorm -i eth0 --type dtp_spoofing --dtp"
 echo ""
-print_warning "⚠️  REMEMBER: This tool is for EDUCATIONAL use only!"
-print_warning "⚠️  Unauthorized use is ILLEGAL!"
-echo ""
+print_warning "REMEMBER: This tool is for EDUCATIONAL use only!"
 echo "=========================================="

@@ -27,27 +27,78 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 # ============================================================
-# CHECK DEPENDENCIES (BUT DON'T BLOCK HELP)
+# SMART DEPENDENCY CHECK & AUTO-INSTALL
 # ============================================================
 
 SCAPY_AVAILABLE = False
 NETIFACES_AVAILABLE = False
 
-try:
-    import netifaces
-    NETIFACES_AVAILABLE = True
-except ImportError:
-    pass
+def install_package_apt(package: str) -> bool:
+    """Install package using apt (works on Kali/Debian)"""
+    try:
+        subprocess.check_call(["apt-get", "install", "-y", "--no-install-recommends", package],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return True
+    except:
+        return False
 
-try:
-    from scapy.all import (
-        Ether, IP, UDP, BOOTP, DHCP,
-        sendp, get_if_hwaddr, conf,
-        ARP, srp
-    )
-    SCAPY_AVAILABLE = True
-except ImportError:
-    pass
+def install_package_pipx(package: str) -> bool:
+    """Install package using pipx (Kali fallback)"""
+    try:
+        subprocess.check_call(["pipx", "install", package],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return True
+    except:
+        return False
+
+def install_package_pip(package: str) -> bool:
+    """Install package using pip (last resort)"""
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package, "--break-system-packages"],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return True
+    except:
+        return False
+
+def ensure_scapy_installed() -> bool:
+    """Ensure Scapy is installed using the best available method"""
+    global SCAPY_AVAILABLE
+    
+    # First check if already available
+    try:
+        from scapy.all import Ether, IP, UDP, BOOTP, DHCP, sendp, get_if_hwaddr, conf, ARP, srp
+        SCAPY_AVAILABLE = True
+        return True
+    except ImportError:
+        pass
+    
+    print("[*] Scapy not found. Attempting automatic installation...")
+    
+    # Try methods in order of preference
+    methods = [
+        ("apt", lambda: install_package_apt("python3-scapy")),
+        ("pipx", lambda: install_package_pipx("scapy")),
+        ("pip", lambda: install_package_pip("scapy"))
+    ]
+    
+    for name, method in methods:
+        print(f"[*] Trying {name}...")
+        if method():
+            print(f"[+] Scapy installed successfully via {name}!")
+            # Try importing again
+            try:
+                from scapy.all import Ether, IP, UDP, BOOTP, DHCP, sendp, get_if_hwaddr, conf, ARP, srp
+                SCAPY_AVAILABLE = True
+                return True
+            except ImportError:
+                continue
+    
+    print("[!] Could not install Scapy automatically.")
+    print("[*] Please install manually using one of these commands:")
+    print("    sudo apt install python3-scapy -y")
+    print("    or")
+    print("    pipx install scapy")
+    return False
 
 # Import modules (will work after dependencies installed)
 from modules.smart_scanner import SmartScanner
@@ -55,6 +106,13 @@ from modules.advanced_report import AdvancedReport
 from modules.arp_spoof import ARPSpoofer
 from modules.auto_lab import AutoLab
 from modules.dtp_spoof import DTPSpoofer
+
+# Try to import netifaces
+try:
+    import netifaces
+    NETIFACES_AVAILABLE = True
+except ImportError:
+    pass
 
 
 class Colors:
@@ -77,6 +135,11 @@ class ZStorm:
     
     def __init__(self, interface: str = "auto", config_file: str = "config.yaml"):
         """Initialize Z-Storm with all modules"""
+        # First ensure Scapy is available
+        if not ensure_scapy_installed():
+            print("[!] Scapy is required for Z-Storm to work. Exiting.")
+            sys.exit(1)
+        
         self.interface = interface or self._auto_detect_interface()
         self.config = self._load_config(config_file)
         
@@ -114,6 +177,7 @@ class ZStorm:
         self.broadcast_ip = "255.255.255.255"
         
         try:
+            from scapy.all import get_if_hwaddr
             self.attacker_mac = get_if_hwaddr(self.interface)
         except:
             self.attacker_mac = "00:00:00:00:00:00"
@@ -296,26 +360,8 @@ class ZStorm:
     def _log_success(self, message: str):
         self.logger.info(f"✅ {message}")
     
-    def _ensure_scapy(self) -> bool:
-        """Ensure Scapy is installed, install if missing"""
-        if SCAPY_AVAILABLE:
-            return True
-        
-        self._log_warning("Scapy is not installed. Attempting automatic installation...")
-        try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "scapy"])
-            self._log_success("Scapy installed successfully. Please restart the command.")
-            return False
-        except Exception as e:
-            self._log_error(f"Failed to install Scapy: {e}")
-            self._log_info("Please install manually: pip install scapy")
-            return False
-    
     def scan_network(self) -> Dict:
         """Run smart scanner"""
-        if not self._ensure_scapy():
-            return {}
-        
         print("\n" + "="*50)
         print("🔍 Smart Scanner")
         print("="*50)
@@ -369,9 +415,7 @@ class ZStorm:
     
     def create_dhcp_discover(self, client_mac: str, transaction_id: Optional[int] = None) -> Ether:
         """Create DHCP Discover packet"""
-        if not SCAPY_AVAILABLE:
-            self._log_error("Scapy not available. Please install: pip install scapy")
-            return None
+        from scapy.all import Ether, IP, UDP, BOOTP, DHCP
         
         if transaction_id is None:
             transaction_id = random.randint(0, 0xffffffff)
@@ -407,8 +451,7 @@ class ZStorm:
     
     def send_packet_thread(self, thread_id: int):
         """Packet sending thread for DHCP Starvation"""
-        if not SCAPY_AVAILABLE:
-            return
+        from scapy.all import sendp
         
         local_count = 0
         
@@ -457,9 +500,6 @@ class ZStorm:
     
     def start_attack(self, network_info: Dict = None, save_report: bool = False, report_name: str = None):
         """Start the selected attack"""
-        if not self._ensure_scapy():
-            return
-        
         print("\n" + "="*50)
         print("⚡ Starting Z-Storm Attack")
         print("="*50)
