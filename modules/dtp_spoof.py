@@ -16,7 +16,13 @@ try:
     from scapy.all import (
         Ether, Dot3, LLC, SNAP, sendp, get_if_hwaddr, conf
     )
-    from scapy.layers.dtp import DTP
+    from scapy.contrib.dtp import (
+    DTP,
+    DTPDomain,
+    DTPStatus,
+    DTPType,
+    DTPNeighbor
+)
     SCAPY_AVAILABLE = True
 except ImportError:
     SCAPY_AVAILABLE = False
